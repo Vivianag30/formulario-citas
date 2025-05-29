@@ -289,31 +289,75 @@
             const data = Object.fromEntries(formData.entries());
             
             try {
+                // Usar modo no CORS para evitar problemas de CORS
                 const response = await fetch(data.scriptUrl, {
                     method: 'POST',
+                    mode: 'no-cors',
                     headers: {
-                        'Content-Type': 'application/json',
+                        'Content-Type': 'application/x-www-form-urlencoded',
                     },
-                    body: JSON.stringify(data)
+                    body: new URLSearchParams(data)
                 });
                 
-                if (response.ok) {
+                // Con no-cors no podemos leer la respuesta, así que asumimos éxito
+                statusMessage.className = 'status-message success';
+                statusMessage.innerHTML = '✅ ¡Cita enviada! Verifica tu Google Sheet y Calendar para confirmar el registro.';
+                statusMessage.style.display = 'block';
+                
+                // Limpiar formulario
+                this.reset();
+                
+                // Establecer fecha mínima a hoy
+                document.getElementById('appointmentDate').min = new Date().toISOString().split('T')[0];
+                
+            } catch (error) {
+                console.error('Error details:', error);
+                
+                // Intentar método alternativo con form data
+                try {
+                    const formData = new FormData();
+                    Object.keys(data).forEach(key => {
+                        formData.append(key, data[key]);
+                    });
+                    
+                    const iframe = document.createElement('iframe');
+                    iframe.style.display = 'none';
+                    document.body.appendChild(iframe);
+                    
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = data.scriptUrl;
+                    form.target = iframe.name;
+                    
+                    Object.keys(data).forEach(key => {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = key;
+                        input.value = data[key];
+                        form.appendChild(input);
+                    });
+                    
+                    document.body.appendChild(form);
+                    form.submit();
+                    
                     statusMessage.className = 'status-message success';
-                    statusMessage.innerHTML = '✅ ¡Cita registrada exitosamente! Se ha agregado al calendario y la hoja de cálculo.';
+                    statusMessage.innerHTML = '✅ ¡Cita enviada! Verifica tu Google Sheet y Calendar para confirmar el registro.';
                     statusMessage.style.display = 'block';
                     
                     // Limpiar formulario
                     this.reset();
                     
-                    // Establecer fecha mínima a hoy
-                    document.getElementById('appointmentDate').min = new Date().toISOString().split('T')[0];
-                } else {
-                    throw new Error('Error en el servidor');
+                    // Limpiar elementos temporales
+                    setTimeout(() => {
+                        document.body.removeChild(form);
+                        document.body.removeChild(iframe);
+                    }, 1000);
+                    
+                } catch (fallbackError) {
+                    statusMessage.className = 'status-message error';
+                    statusMessage.innerHTML = '❌ Error al registrar la cita. Por favor, verifica la URL del script y vuelve a intentar.';
+                    statusMessage.style.display = 'block';
                 }
-            } catch (error) {
-                statusMessage.className = 'status-message error';
-                statusMessage.innerHTML = '❌ Error al registrar la cita. Por favor, verifica la URL del script y vuelve a intentar.';
-                statusMessage.style.display = 'block';
             }
             
             // Restaurar botón
